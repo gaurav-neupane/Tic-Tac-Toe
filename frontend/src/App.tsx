@@ -1,12 +1,17 @@
+import { BrowserRouter, Route, Routes } from "react-router";
+import Home from "./pages/Home";
+import Game from "./pages/Game";
+
 
 function App() {
-
   return (
-    <div className="w-full h-screen flex justify-center items-center">
-      <h1 className="">Hey Baby girl</h1>
-    </div>
- 
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home/>} />
+        <Route path="/game" element={<Game/>} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
-export default App
+export default App;
