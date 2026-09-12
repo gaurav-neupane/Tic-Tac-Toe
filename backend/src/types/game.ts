@@ -9,4 +9,14 @@ export interface GameState{
     turn: Player,
     winner: Player | null,
     status: GameStatus
+};
+
+export type RoomPlayers = {
+    X: string | null,
+    O: string | null
+}
+
+export type RoomState = {
+    players: RoomPlayers,
+    game: GameState
 }
