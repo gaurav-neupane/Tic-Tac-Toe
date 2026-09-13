@@ -7,7 +7,7 @@ export type GameStatus = "waiting" | "playing" | "finished";
 export interface GameState{
     board: CellValue[],
     turn: Player,
-    winner: Player | null,
+    winner: Player | null | "draw",
     status: GameStatus
 };
 

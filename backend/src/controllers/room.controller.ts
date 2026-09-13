@@ -45,5 +45,19 @@ export async function joinRoom(c: Context) {
 
 export async function wsConnect(c:Context) {
     const code = c.req.param("code");
+    if (!code) {
+        return c.json({
+            error: "Code not found",
+        }, 400);
+    };
+    if (code.length < 6 || code.length > 6) {
+        return c.json({
+            error: "Invalid code",
+        }, 400);
+    }
 
+    const id = env.GAME_ROOM.idFromName(code);
+    const room = env.GAME_ROOM.get(id);
+
+    return room.fetch(c.req.raw);
 }

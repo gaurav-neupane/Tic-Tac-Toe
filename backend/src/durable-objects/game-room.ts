@@ -1,3 +1,4 @@
+import { handleMove } from "../services/game.service";
 import { createNewRoom, joinExistingRoom } from "../services/room.service";
 import { Player, RoomState } from "../types/game"
 
@@ -125,14 +126,25 @@ export class GameRoom implements DurableObject{
             })
         );
 
+        if (this.hasBothPlayers()) {
+            this.roomState.game.status = "playing";
+            this.broadcast({
+                type: "game_started",
+                game: this.roomState.game
+            });
+        }
+
         server.addEventListener("message", (event) => {
-            
+            this.handleMessage(player,event.data);
         });
 
         server.addEventListener("close", () => {
             this.connections.delete(player);
+            this.broadcast({
+                type: "player_disconnected",
+                player
+            });
         });
-
 
         return new Response(null, {
             status: 101,
@@ -141,5 +153,53 @@ export class GameRoom implements DurableObject{
 
     }
 
+    private broadcast(message: unknown) {
+        const data = JSON.stringify(message);
+        for (const socket of this.connections.values()) {
+            socket.send(data);
+        }
+    };
 
+    private hasBothPlayers(): boolean{
+        return this.connections.has("X") && this.connections.has("O");
+    };
+
+    private handleMessage(player: Player, data: string | ArrayBuffer) {
+        try {
+            const message = JSON.parse(data.toString());
+            if (message.type === "move") {
+                this.handlePlayerMove(player, message.position);
+            };
+            
+        } catch {
+            const socket = this.connections.get(player);
+            socket?.send(JSON.stringify({
+                type: "error",
+                message: "Invalid message",
+            }));
+        }
+    }
+
+    private async handlePlayerMove(player: Player, position: number) {
+        const result = handleMove(player, position, this.roomState.game);
+        if (!result.success) {
+            this.sendError(player, result.error!);
+            return;
+        }
+        this.roomState.game = result.gameState!;
+        await this.ctx.storage.put("room", this.roomState);
+
+        this.broadcast({
+            type: "game_status",
+            game: this.roomState.game
+        });
+    }
+
+    private sendError(player: Player, message: string) {
+        const socket = this.connections.get(player);
+        socket?.send(JSON.stringify({
+            type: "error",
+            message
+        }))
+    }
 }
