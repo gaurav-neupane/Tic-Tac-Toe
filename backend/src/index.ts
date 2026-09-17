@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import roomRoutes from './routes/room';
 import { cors } from 'hono/cors';
+import { GameRoom } from './durable-objects/game-room';
 
 const app = new Hono()
 
@@ -14,5 +15,5 @@ app.get('/', (c) => {
 
 app.route('/room', roomRoutes);
 
-
+export { GameRoom };
 export default app
