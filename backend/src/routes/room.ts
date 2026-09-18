@@ -3,7 +3,7 @@ import { createRoom, joinRoom, wsConnect } from "../controllers/room.controller"
 
 const roomRoutes = new Hono();
 
-roomRoutes.post("/", createRoom);
+roomRoutes.post("/create", createRoom);
 
 roomRoutes.post("/:code/join", joinRoom);
 
