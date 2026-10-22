@@ -43,7 +43,7 @@ export class GameRoom implements DurableObject{
             return this.joinRoom(request);
         }
 
-        if (url.pathname === "/ws") {
+        if (url.pathname.endsWith("/ws")) {
             return this.handleWebSocket(request);
         }
 
@@ -129,7 +129,7 @@ export class GameRoom implements DurableObject{
         if (this.hasBothPlayers()) {
             this.roomState.game.status = "playing";
             this.broadcast({
-                type: "game_started",
+                type: "game_status",
                 game: this.roomState.game
             });
         }
