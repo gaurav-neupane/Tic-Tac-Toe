@@ -1,37 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Board from "../components/Board";
-import { type GameState } from "../types/game";
+import { type Player, type GameState} from "../types/game";
+import { useNavigate } from "react-router";
+import Modal from "../components/Modal";
+import { toast } from "sonner";
 
 export default function Game() {
-  const [gameState, setGameState] = useState<GameState>({
-    board: [null, null, null, null, null, null, null, null, null],
-    turn: "X",
-    winner: null,
-  });
-
+  const navigate = useNavigate();
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const token = sessionStorage.getItem("playerToken");
+  const roomCode = sessionStorage.getItem("roomCode");
   useEffect(() => {
-    const token = sessionStorage.getItem("playerToken");
-    const roomCode = sessionStorage.getItem("roomCode");
-  }, []);
+    if (!token || !roomCode) {
+      navigate('/');
+      return;
+    }
+    const ws = new WebSocket(`ws://localhost:8787/room/${roomCode}/ws?token=${token}`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("Websocket connected");
+    }
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "player_assigned") {
+        setPlayer(data.player);
+        return;
+      }
+      if (data.type === "game_status") {
+        setGameState(data.game);
+        return;
+      }
+      if (data.type === "error") {
+        toast.error(data.message);
+        return;
+      }
+    }
+    ws.onerror = (error) => {
+      console.log(error);
+    }
+    ws.onclose = () => {
+      console.log("Websocket disconnected");
+    }
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [navigate]);
 
   function handleCellClick(id: number) {
-    setGameState((prevState) => {
-      const newBoard = [...prevState.board];
-      newBoard[id] = prevState.turn;
-      const nextTurn = prevState.turn === "X" ? "O" : "X";
-      return {
-        ...prevState,
-        board: newBoard,
-        turn: nextTurn,
-      };
-    });
+    if (!wsRef.current) {
+      return;
+    }
+    wsRef.current.send(JSON.stringify({
+      type: "move",
+      position: id
+    }));
+  }
+
+  if (!gameState) {
+    return (
+      <div className="w-full h-screen flex flex-col justify-evenly items-center bg-black">
+      <Modal isOpen={true}>
+        <div className="w-full h-full flex justify-center items-center">
+          <h2 className="text-white">Loading...</h2> 
+        </div>
+      </Modal>
+      </div>
+    )
   }
 
   return (
     <div className="w-full h-screen flex flex-col justify-evenly items-center bg-black">
-      <h1 className="text-white text-5xl">{gameState.turn} Turn</h1>
+      {gameState.turn === player ?  <h1 className="text-white text-5xl">Your Turn</h1> :  <h1 className="text-white text-5xl">Opponent's Turn</h1>}
       <Board board={gameState.board} makeMove={handleCellClick} />
-      <div></div>
+      <Modal isOpen={gameState.status === "waiting"}>
+        <div className="w-full h-full flex flex-col justify-center items-center gap-2">
+          <h2 className="text-white text-lg md:text-xl">The code is: {<span className="font-bold">{roomCode}</span>}</h2>
+          <h3 className="text-white text-lg md:text-xl">Waiting for other player to join...</h3> 
+        </div>
+      </Modal>
+      <Modal isOpen={gameState.status === "finished"}>
+        <div className="w-full h-full flex justify-center items-center">
+            <h2 className="text-white text-lg md:text-xl">Game is finished</h2>
+        </div>
+      </Modal>
     </div>
   );
 }
