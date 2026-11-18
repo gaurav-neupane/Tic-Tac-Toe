@@ -18,8 +18,8 @@ export default function Home() {
             const { roomCode, token } = response.data;
             console.log(roomCode);
             console.log(token);
-            sessionStorage.setItem("playerToken", token);
-            sessionStorage.setItem("roomCode", roomCode);
+            localStorage.setItem("playerToken", token);
+            localStorage.setItem("roomCode", roomCode);
             navigate('/game');    
         } catch (error) {
             console.log(error);
@@ -29,7 +29,10 @@ export default function Home() {
     }
 
     async function joinRoom() {
+        setIsCreateModalOpen(true);
         const roomCode = roomCodeRef.current?.value.trim().toUpperCase();
+        const savedRoomCode = localStorage.getItem("roomCode");
+        const savedToken = localStorage.getItem("playerToken")
         if (!roomCode) {
             toast.error("Please enter a room code");
             return;
@@ -38,14 +41,19 @@ export default function Home() {
             toast.error("Room code must be 6 characters");
             return;
         }
+        if (savedRoomCode === roomCode && savedToken) {
+            navigate('/game');
+        }
         try {
             const response = await axios.post(`http://localhost:8787/room/${roomCode}/join`)
             const { token } = response.data;
-            sessionStorage.setItem("playerToken", token);
-            sessionStorage.setItem("roomCode", roomCode);
+            localStorage.setItem("playerToken", token);
+            localStorage.setItem("roomCode", roomCode);
             navigate('/game')
         } catch (error) {
             console.log(error);
+        } finally {
+            setIsCreateModalOpen(false);
         }
 
     };
