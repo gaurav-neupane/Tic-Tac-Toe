@@ -40,7 +40,7 @@ export class GameRoom implements DurableObject{
         }
 
         if (url.pathname === "/join") {
-            return this.joinRoom(request);
+            return this.joinRoom();
         }
 
         if (url.pathname.endsWith("/ws")) {
@@ -61,10 +61,8 @@ export class GameRoom implements DurableObject{
         })
     }
 
-    private async joinRoom(request: Request): Promise<Response>{
-        const url = new URL(request.url);
-        const token = url.searchParams.get("token");
-        const result = await joinExistingRoom(this.roomState, token!);
+    private async joinRoom(): Promise<Response>{
+        const result = await joinExistingRoom(this.roomState);
         if ("error" in result) {
             return Response.json({
                 error: result.error,
@@ -87,11 +85,7 @@ export class GameRoom implements DurableObject{
             return new Response("Expected Websocket", { status: 426 });
         }
 
-        const { 0: client, 1: server } = new WebSocketPair();
-
-        server.accept();
-
-        const url = new URL(request.url);
+                const url = new URL(request.url);
         const token = url.searchParams.get("token");
 
         if (!token) {
@@ -109,7 +103,11 @@ export class GameRoom implements DurableObject{
         if (!player) {
             return new Response("Invalid token", { status: 401 });
         }
-        
+
+        const { 0: client, 1: server } = new WebSocketPair();
+
+        server.accept();
+
         this.connections.set(player, server);
 
         server.send(
