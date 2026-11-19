@@ -12,6 +12,7 @@ export default function Game() {
   const wsRef = useRef<WebSocket | null>(null);
   const token = localStorage.getItem("playerToken");
   const roomCode = localStorage.getItem("roomCode");
+  
   useEffect(() => {
     if (!token || !roomCode) {
       navigate("/");
@@ -33,7 +34,6 @@ export default function Game() {
       }
       if (data.type === "game_status") {
         setGameState(data.game);
-        console.log(gameState);
         return;
       }
       if (data.type === "error") {
