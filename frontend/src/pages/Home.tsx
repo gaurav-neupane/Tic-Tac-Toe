@@ -43,6 +43,7 @@ export default function Home() {
         }
         if (savedRoomCode === roomCode && savedToken) {
             navigate('/game');
+            return;
         }
         try {
             const response = await axios.post(`http://localhost:8787/room/${roomCode}/join`)
