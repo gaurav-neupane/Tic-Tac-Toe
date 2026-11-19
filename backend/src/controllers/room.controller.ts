@@ -36,9 +36,15 @@ export async function joinRoom(c: Context) {
 
     const data = await response.json() as {};
 
+    if ("error" in data) {
+        return c.json({
+            ...data
+        }, 400);
+    }
+
     return c.json({
-        ...data
-    });
+        ...data,
+    },200);
 
  
 }

@@ -85,7 +85,7 @@ export class GameRoom implements DurableObject{
             return new Response("Expected Websocket", { status: 426 });
         }
 
-                const url = new URL(request.url);
+        const url = new URL(request.url);
         const token = url.searchParams.get("token");
 
         if (!token) {
@@ -124,8 +124,9 @@ export class GameRoom implements DurableObject{
             })
         );
 
-        if (this.hasBothPlayers()) {
+       if(this.hasBothPlayers() && this.roomState.game.status === "waiting"){
             this.roomState.game.status = "playing";
+            await this.ctx.storage.put("room", this.roomState);
             this.broadcast({
                 type: "game_status",
                 game: this.roomState.game
