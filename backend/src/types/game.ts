@@ -2,7 +2,12 @@ export type Player = "X" | "O";
 
 export type CellValue = Player | null;
 
-export type GameStatus = "waiting" | "playing" | "finished";
+export type GameStatus = "waiting" | "playing" | "finished" | "abandoned";
+
+export interface DisconnectState{
+    X: number | null;
+    O: number | null;
+}
     
 export interface GameState{
     board: CellValue[],
@@ -18,5 +23,6 @@ export type RoomPlayers = {
 
 export type RoomState = {
     players: RoomPlayers,
-    game: GameState
+    game: GameState,
+    disconnect: DisconnectState
 }
