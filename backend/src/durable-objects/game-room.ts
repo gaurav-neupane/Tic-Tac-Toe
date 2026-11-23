@@ -2,6 +2,8 @@ import { handleMove } from "../services/game.service";
 import { createNewRoom, joinExistingRoom } from "../services/room.service";
 import { Player, RoomState } from "../types/game"
 
+const DISCONNECT_TIMEOUT = 30 * 1000;
+
 export class GameRoom implements DurableObject{
 
     private connections: Map<Player, WebSocket> = new Map();
@@ -16,6 +18,10 @@ export class GameRoom implements DurableObject{
             turn: "X",
             winner: null,
             status: "waiting"
+        },
+        disconnect: {
+            X: null,
+            O: null
         }
     }
 
@@ -104,11 +110,33 @@ export class GameRoom implements DurableObject{
             return new Response("Invalid token", { status: 401 });
         }
 
+        if (this.roomState.game.status === "abandoned") {
+            return Response.json(
+                { error: "Room has been abandoned" },
+                { status: 410 }
+            );
+        };
+
+        const deadline = this.roomState.disconnect[player];
+
+        if (this.roomState.disconnect[player] !== null) {
+            this.roomState.disconnect[player] = null;
+            await this.ctx.storage.put("room", this.roomState);
+            await this.scheduleNextAlarm();
+        }
+
         const { 0: client, 1: server } = new WebSocketPair();
 
         server.accept();
 
         this.connections.set(player, server);
+
+        if (deadline !== null) {
+            this.broadcast({
+                type: "player_reconnected",
+                player
+            });
+        }
 
         server.send(
             JSON.stringify({
@@ -124,7 +152,7 @@ export class GameRoom implements DurableObject{
             })
         );
 
-       if(this.hasBothPlayers() && this.roomState.game.status === "waiting"){
+        if(this.hasBothPlayers() && this.roomState.game.status === "waiting"){
             this.roomState.game.status = "playing";
             await this.ctx.storage.put("room", this.roomState);
             this.broadcast({
@@ -133,16 +161,32 @@ export class GameRoom implements DurableObject{
             });
         }
 
+        if(this.hasBothPlayers() && this.roomState.game.status )
+
         server.addEventListener("message", (event) => {
             this.handleMessage(player,event.data);
         });
 
-        server.addEventListener("close", () => {
+        server.addEventListener("close", async () => {
+            
+            if (this.connections.get(player) !== server) {
+                return;
+            }
+
             this.connections.delete(player);
+            if (this.roomState.game.status !== "playing") {
+                return;
+            }
+            this.roomState.disconnect[player] = Date.now() + DISCONNECT_TIMEOUT;
+            await this.ctx.storage.put("room", this.roomState);
+
             this.broadcast({
                 type: "player_disconnected",
-                player
+                player,
+                expiresAt: this.roomState.disconnect[player]
             });
+
+            await this.scheduleNextAlarm();
         });
 
         return new Response(null, {
@@ -200,5 +244,46 @@ export class GameRoom implements DurableObject{
             type: "error",
             message
         }))
+    }
+
+    private async scheduleNextAlarm() {
+        const deadlines = Object.values(this.roomState.disconnect).filter((deadline): deadline is number => deadline != null);
+
+        if (deadlines.length === 0) {
+            await this.ctx.storage.deleteAlarm();
+            return;
+        }
+
+        await this.ctx.storage.setAlarm((Math.min(...deadlines)));
+    }
+
+    async alarm() {
+        await this.loadGame();
+        
+        if (this.roomState.game.status !== "playing") {
+            return;
+        }
+
+        const now = Date.now();
+
+        const expiredPlayer = (Object.entries(this.roomState.disconnect) as [Player, number | null][]).find(([_, deadline]) => deadline !== null && deadline <= now);
+
+        if (expiredPlayer) {
+            const [player] = expiredPlayer;
+            this.roomState.game.status = "abandoned";
+            await this.ctx.storage.put("room", this.roomState);
+
+            this.broadcast({
+                type: "room_abandoned",
+                player,
+                message: `Room has been abandoned due to disconnection timeout of player ${player}`
+            });
+
+            await this.ctx.storage.deleteAlarm();
+
+            return;
+        }
+
+        await this.scheduleNextAlarm();
     }
 }

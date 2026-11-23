@@ -9,6 +9,7 @@ export default function Game() {
   const navigate = useNavigate();
   const [player, setPlayer] = useState<Player | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [disconnectInfo, setDisconnectInfo] = useState<{ player: Player; expiresAt: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const token = localStorage.getItem("playerToken");
   const roomCode = localStorage.getItem("roomCode");
@@ -38,6 +39,23 @@ export default function Game() {
       }
       if (data.type === "error") {
         toast.error(data.message);
+        return;
+      }
+      if (data.type === "player_disconnected") {
+        setDisconnectInfo({
+          player: data.player,
+          expiresAt: data.expiresAt,
+        });
+        return;
+      }
+      if (data.type === "player_reconnected") {
+        setDisconnectInfo(null);
+        return;
+      }
+      if (data.type === "room_abandoned") {
+        setDisconnectInfo(null);
+        toast.error("Room abandoned due to disconnection timeout.");
+        navigate("/");
         return;
       }
     };
@@ -108,6 +126,16 @@ export default function Game() {
             <button className="bg-white w-42 h-12 text-lg md:text-xl active:scale-95 hover:scale-105">Play again</button>
             <button className="bg-white w-42 h-12 text-lg md:text-xl active:scale-95 hover:scale-105">Exit</button>
           </div>
+        </div>
+      </Modal>
+      <Modal isOpen={disconnectInfo !== null}>
+        <div className="w-full h-full flex flex-col justify-evenly items-center gap-2">
+          <h2 className="text-white text-lg md:text-xl">
+            Your Opponent Disconnected.
+          </h2>
+          <h2 className="text-white text-lg md:text-xl">
+            Waiting for them to join...
+          </h2>
         </div>
       </Modal>
     </div>
